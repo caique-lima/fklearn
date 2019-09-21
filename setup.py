@@ -21,8 +21,9 @@ tools_deps = requirements_from_pip("requirements_tools.txt")
 lgbm_deps = requirements_from_pip("requirements_lgbm.txt")
 xgboost_deps = requirements_from_pip("requirements_xgboost.txt")
 catboost_deps = requirements_from_pip("requirements_catboost.txt")
+automl_deps = requirements_from_pip("requirements_automl.txt")
 
-all_models_deps = lgbm_deps + xgboost_deps + catboost_deps
+all_models_deps = lgbm_deps + xgboost_deps + catboost_deps + automl_deps
 all_deps = all_models_deps + tools_deps
 devel_deps = test_deps + all_deps
 
@@ -41,6 +42,7 @@ setup(name=MODULE_NAME,
                       "catboost": catboost_deps,
                       "tools": tools_deps,
                       "devel": devel_deps,
+                      "automl": automl_deps,
                       "all_models": all_models_deps,
                       "devel": devel_deps,
                       "all": all_deps},
