@@ -1,7 +1,9 @@
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Iterable
 
 import numpy as np
 import pandas as pd
+import gc
+
 from toolz import merge, curry, assoc
 from sklearn.linear_model import LinearRegression
 from sklearn.gaussian_process import GaussianProcessRegressor, kernels
@@ -406,7 +408,7 @@ gp_regression_learner.__doc__ += learner_return_docstring("Gaussian Process Regr
 
 @curry
 @log_learner_time(learner_name='lgbm_regression_learner')
-def lgbm_regression_learner(df: pd.DataFrame,
+def lgbm_regression_learner(df: Union[pd.DataFrame, Iterable[pd.DataFrame]],
                             features: List[str],
                             target: str,
                             learning_rate: float = 0.1,
@@ -474,14 +476,22 @@ def lgbm_regression_learner(df: pd.DataFrame,
     params = assoc(params, "eta", learning_rate)
     params = params if "objective" in params else assoc(params, "objective", 'regression')
 
-    weights = df[weight_column].values if weight_column else None
+    df = [df] if isinstance(df, pd.DataFrame) else df
+    lgb_estimator = None
 
-    features = features if not encode_extra_cols else expand_features_encoded(df, features)
+    for _df in df:
+        weights = _df[weight_column].values if weight_column else None
+        features = features if not encode_extra_cols else expand_features_encoded(_df, features)
+        dtrain = lgbm.Dataset(_df[features].values, label=_df[target], feature_name=list(map(str, features)), weight=weights,
+                                silent=True)
 
-    dtrain = lgbm.Dataset(df[features].values, label=df[target], feature_name=list(map(str, features)), weight=weights,
-                          silent=True)
+        bst = lgbm.train(params,
+                         dtrain,
+                         num_estimators,
+                         init_model=lgb_estimator)
 
-    bst = lgbm.train(params, dtrain, num_estimators)
+        del _df, dtrain
+        gc.collect()
 
     def p(new_df: pd.DataFrame, apply_shap: bool = False) -> pd.DataFrame:
         col_dict = {prediction_column: bst.predict(new_df[features].values)}
@@ -512,7 +522,7 @@ def lgbm_regression_learner(df: pd.DataFrame,
         'training_samples': len(df)},
         'object': bst}
 
-    return p, p(df), log
+    return p, pd.concat([p(_df) for _df in df]), log
 
 
 lgbm_regression_learner.__doc__ += learner_return_docstring("LGBM Regressor")
